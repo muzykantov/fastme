@@ -1,5 +1,7 @@
 # fastme (fast matching engine) library
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/newity/fastme)](https://goreportcard.com/report/github.com/newity/fastme)
+
 ## Design
 
 The library solves the task of recalculating the exchange order book. A classic matching engine consists of limit orders (orders) for buying or selling (exchanging) some commodity for another commodity, usually currency.

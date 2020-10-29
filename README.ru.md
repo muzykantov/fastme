@@ -1,5 +1,7 @@
 # Библиотека fastme (fast matching engine)
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/newity/fastme)](https://goreportcard.com/report/github.com/newity/fastme)
+
 ## Предназначение
 
 Библиотека решает задачу пересчета биржевого стакана для обмена активов. Классический биржевой стакан состоит из лимитных заявок (ордеров) на покупку или продажу (обмен) какого-то товара на другой товар, как правило валюту.

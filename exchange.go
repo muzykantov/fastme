@@ -49,7 +49,7 @@ type Wallet interface {
 	UpdateInOrder(context.Context, Asset, Value)
 }
 
-// Order is the extensible interface responsible for containig information about order
+// Order is the extensible interface responsible for containing information about order
 type Order interface {
 	// ID returns any uinique string for order
 	ID() string
@@ -60,7 +60,7 @@ type Order interface {
 	// Sell returns true if order for selling, true otherwise
 	Sell() bool
 
-	// Price retuns order price
+	// Price returns order price
 	Price() Value
 
 	// Quantity returns current order quantity

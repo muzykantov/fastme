@@ -151,7 +151,7 @@ func (t *tOrder) Sell() bool {
 	return t.sell
 }
 
-// Price retuns order price
+// Price returns order price
 func (t *tOrder) Price() Value {
 	return t.price
 }

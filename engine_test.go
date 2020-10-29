@@ -1099,3 +1099,276 @@ func BenchmarkOrderProcessung(b *testing.B) {
 	b.Logf("N: %d, Elapsed: %v, TPS: %f", b.N, elapsed, float64(b.N*54)/elapsed.Seconds())
 
 }
+
+func TestSetFeeHandler(t *testing.T) {
+	var (
+		asset1, asset2 = Asset("apples"), Asset("dollars")
+		engine         = NewEngine(asset1, asset2)
+	)
+	engine.SetFeeHandler(&emptyFeeHandler{})
+}
+
+func TestPlaceOrderErrors(t *testing.T) {
+	var (
+		processor                 = newEventListener()
+		asset1, asset2            = Asset("apples"), Asset("dollars")
+		wallet1, wallet2, wallet3 = newWallet(), newWallet(), newWallet()
+
+		engine = NewEngine(asset1, asset2)
+
+		order1 = newOrder(
+			"1",
+			wallet1,
+			false,
+			-1,
+			10,
+		)
+		order2 = newOrder(
+			"2",
+			wallet2,
+			false,
+			1,
+			-20,
+		)
+		order3 = newOrder(
+			"3",
+			wallet3,
+			true,
+			2,
+			100,
+		)
+		order4 = newOrder(
+			"4",
+			wallet3,
+			true,
+			2,
+			0,
+		)
+		order5 = newOrder(
+			"5",
+			wallet1,
+			false,
+			2,
+			0,
+		)
+		order6 = newOrder(
+			"6",
+			wallet1,
+			false,
+			5,
+			2,
+		)
+		order7 = newOrder(
+			"7",
+			wallet3,
+			true,
+			3,
+			0,
+		)
+	)
+
+	updateWalletBalance(wallet1, asset2, 10)
+	updateWalletBalance(wallet2, asset2, 20)
+	updateWalletBalance(wallet3, asset1, 2)
+
+	if err := engine.PlaceOrder(context.Background(), processor, order1); err == nil {
+		t.Fatal()
+	}
+	if err := engine.PlaceOrder(context.Background(), processor, order2); err == nil {
+		t.Fatal()
+	}
+
+	if err := engine.PlaceOrder(context.Background(), processor, order3); err != nil {
+		t.Fatal(err)
+	}
+	if err := engine.PlaceOrder(context.Background(), processor, order3); err == nil {
+		t.Fatal()
+	}
+	if err := engine.PlaceOrder(context.Background(), processor, order5); err == nil {
+		t.Fatal()
+	}
+
+	engine.CancelOrder(context.Background(), processor, order3)
+
+	if err := engine.PlaceOrder(context.Background(), processor, order4); err == nil {
+		t.Fatal()
+	}
+
+	if err := engine.PlaceOrder(context.Background(), processor, order6); err != nil {
+		t.Fatal(err)
+	}
+	if err := engine.PlaceOrder(context.Background(), processor, order7); err == nil {
+		t.Fatal()
+	}
+}
+
+func TestMiscFunctions(t *testing.T) {
+	var (
+		processor        = newEventListener()
+		asset1, asset2   = Asset("apples"), Asset("dollars")
+		wallet1, wallet2 = newWallet(), newWallet()
+
+		engine = NewEngine(asset1, asset2)
+
+		order1 = newOrder(
+			"1",
+			wallet1,
+			true,
+			1,
+			20,
+		)
+		order2 = newOrder(
+			"2",
+			wallet2,
+			false,
+			1,
+			10,
+		)
+		order3 = newOrder(
+			"3",
+			wallet2,
+			false,
+			1,
+			10,
+		)
+	)
+
+	updateWalletBalance(wallet1, asset1, 2)
+	updateWalletBalance(wallet2, asset2, 20)
+
+	if err := engine.PlaceOrder(context.Background(), processor, order1); err != nil {
+		t.Fatal(err)
+	}
+	if err := engine.PlaceOrder(context.Background(), processor, order2); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log(engine.Quantity(true, tFloat64(10.0)))
+	t.Log(engine.Price(true, tFloat64(1.0)))
+	t.Log(engine.Quantity(false, tFloat64(10.0)))
+	t.Log(engine.Price(false, tFloat64(1.0)))
+	t.Log(engine.Spread())
+	t.Log(engine.Orders())
+	t.Log(engine.FindOrder("1"))
+	t.Log(engine.FindOrder("10"))
+	engine.OrderBook(func(asks bool, price, volume Value, len int) { t.Log(asks, price, volume, len) })
+	engine.pull(context.Background(), order3)
+	engine.PushOrder(context.Background(), order1)
+	l := emptyListener{}
+	l.OnIncomingOrderPartial(context.Background(), &tOrder{}, Volume{})
+	l.OnIncomingOrderDone(context.Background(), &tOrder{}, Volume{})
+	l.OnIncomingOrderPlaced(context.Background(), &tOrder{})
+	l.OnExistingOrderPartial(context.Background(), &tOrder{}, Volume{})
+	l.OnExistingOrderDone(context.Background(), &tOrder{}, Volume{})
+	l.OnExistingOrderCanceled(context.Background(), &tOrder{})
+	l.OnBalanceChanged(context.Background(), &tWallet{}, asset1, tFloat64(0.0))
+	l.OnInOrderChanged(context.Background(), &tWallet{}, asset1, tFloat64(0.0))
+}
+
+func newWithIntComparator() *rbTree {
+	return &rbTree{comp: func(a, b interface{}) int {
+		aAsserted := a.(int)
+		bAsserted := b.(int)
+		switch {
+		case aAsserted > bAsserted:
+			return 1
+		case aAsserted < bAsserted:
+			return -1
+		default:
+			return 0
+		}
+	}}
+}
+
+func newWithStringComparator() *rbTree {
+	return &rbTree{comp: func(a, b interface{}) int {
+		s1 := a.(string)
+		s2 := b.(string)
+		min := len(s2)
+		if len(s1) < len(s2) {
+			min = len(s1)
+		}
+		diff := 0
+		for i := 0; i < min && diff == 0; i++ {
+			diff = int(s1[i]) - int(s2[i])
+		}
+		if diff == 0 {
+			diff = len(s1) - len(s2)
+		}
+		if diff < 0 {
+			return -1
+		}
+		if diff > 0 {
+			return 1
+		}
+		return 0
+	}}
+}
+
+func TestRedBlackTreePut(t *testing.T) {
+	tree := newWithIntComparator()
+	tree.put(5, "e")
+	tree.put(6, "f")
+	tree.put(7, "g")
+	tree.put(3, "c")
+	tree.put(4, "d")
+	tree.put(1, "x")
+	tree.put(2, "b")
+	tree.put(1, "a") //overwrite
+
+	tree = newWithIntComparator()
+	tree.put(1, "a")
+	tree.put(5, "e")
+	tree.put(6, "f")
+	tree.put(7, "g")
+	tree.put(3, "c")
+	tree.put(4, "d")
+	tree.put(1, "x") // overwrite
+	tree.put(2, "b")
+
+	tree = newWithIntComparator()
+	tree.put(5, "e")
+	tree.put(6, "f")
+	tree.put(7, "g")
+	tree.put(3, "c")
+	tree.put(4, "d")
+	tree.put(1, "x")
+	tree.put(2, "b")
+
+	tree = newWithIntComparator()
+	tree.put(5, "e")
+	tree.put(6, "f")
+	tree.put(7, "g")
+	tree.put(3, "c")
+	tree.put(4, "d")
+	tree.put(1, "x")
+	tree.put(2, "b")
+	tree.put(1, "a") //overwrite
+
+	tree = newWithIntComparator()
+	tree.put(5, "e")
+	tree.put(6, "f")
+	tree.put(7, "g")
+	tree.put(3, "c")
+	tree.put(4, "d")
+	tree.put(1, "x")
+	tree.put(2, "b")
+	tree.put(1, "a") //overwrite
+
+	tree = newWithIntComparator()
+	tree.put(13, 5)
+	tree.put(8, 3)
+	tree.put(17, 7)
+	tree.put(1, 1)
+	tree.put(11, 4)
+	tree.put(15, 6)
+	tree.put(25, 9)
+	tree.put(6, 2)
+	tree.put(22, 8)
+	tree.put(27, 10)
+
+	tree = newWithStringComparator()
+	tree.put("c", "3")
+	tree.put("b", "2")
+	tree.put("a", "1")
+}

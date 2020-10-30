@@ -42,7 +42,7 @@ When making a transaction or closing a position, the matching engine also notifi
 ### Value
 
 ```Go
-// Value calcultes math operations
+// Value calculates math operations
 type Value interface {
 	// Add is an "+" operation
 	Add(Value) Value
@@ -114,7 +114,7 @@ Must update the balance of the wallet when the transaction.
 
 ```Go
 type Order interface {
-	// ID returns any uinique string for order
+	// ID returns any unique string for order
 	ID() string
 
 	// Owner returns wallet to debit or credit asset on exchange process

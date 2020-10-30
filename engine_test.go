@@ -694,49 +694,27 @@ func TestLimitSell(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if processor.partial.ID() != "3" {
-		t.Fatalf("invalid result")
-	}
-	if processor.partial.Quantity().(tFloat64) != 1 {
-		t.Fatalf("invalid result")
-	}
-	if processor.done != 2 {
-		t.Fatalf("invalid result")
-	}
-	if processor.priceDone != 30 {
-		t.Fatalf("invalid result")
-	}
-	if processor.qtyDone != 2 {
-		t.Fatalf("invalid result")
-	}
-	if engine.asks.prices["5"].volume.(tFloat64) != 1 {
+	if processor.partial.ID() != "3" ||
+		processor.partial.Quantity().(tFloat64) != 1 ||
+		processor.done != 2 ||
+		engine.asks.prices["5"].volume.(tFloat64) != 1 {
 		t.Fatalf("invalid result")
 	}
 
 	// --------------------------------------
 
-	if walletBalance(wallet1, asset1) != 1 {
-		t.Fatal("invalid result")
-	}
-	if walletBalance(wallet2, asset1) != 1 {
-		t.Fatal("invalid result")
-	}
-	if walletBalance(wallet3, asset1) != 0 {
-		t.Fatal("invalid result")
-	}
-	if walletInOrder(wallet3, asset1) != 1 {
+	if walletBalance(wallet1, asset1) != 1 ||
+		walletBalance(wallet2, asset1) != 1 ||
+		walletBalance(wallet3, asset1) != 0 ||
+		walletInOrder(wallet3, asset1) != 1 {
 		t.Fatal("invalid result")
 	}
 
 	// --------------------------------------
 
-	if walletBalance(wallet1, asset2) != 0 {
-		t.Fatal("invalid result")
-	}
-	if walletBalance(wallet2, asset2) != 0 {
-		t.Fatal("invalid result")
-	}
-	if walletBalance(wallet3, asset2) != 30 {
+	if walletBalance(wallet1, asset2) != 0 ||
+		walletBalance(wallet2, asset2) != 0 ||
+		walletBalance(wallet3, asset2) != 30 {
 		t.Fatal("invalid result")
 	}
 }
@@ -786,49 +764,29 @@ func TestLimitBuy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if processor.partial.ID() != "3" {
-		t.Fatalf("invalid result")
-	}
-	if processor.partial.Quantity().(tFloat64) != 1 {
-		t.Fatalf("invalid result")
-	}
-	if processor.done != 2 {
-		t.Fatalf("invalid result")
-	}
-	if processor.priceDone != 30 {
-		t.Fatalf("invalid result")
-	}
-	if processor.qtyDone != 2 {
-		t.Fatalf("invalid result")
-	}
-	if engine.bids.prices["20"].volume.(tFloat64) != 1 {
+	if processor.partial.ID() != "3" ||
+		processor.partial.Quantity().(tFloat64) != 1 ||
+		processor.done != 2 ||
+		processor.priceDone != 30 ||
+		processor.qtyDone != 2 ||
+		engine.bids.prices["20"].volume.(tFloat64) != 1 {
 		t.Fatalf("invalid result")
 	}
 
 	// --------------------------------------
 
-	if walletBalance(wallet1, asset2) != 10 {
-		t.Fatal("invalid result")
-	}
-	if walletBalance(wallet2, asset2) != 20 {
-		t.Fatal("invalid result")
-	}
-	if walletBalance(wallet3, asset2) != 10 {
-		t.Fatal("invalid result")
-	}
-	if walletInOrder(wallet3, asset2) != 20 {
+	if walletBalance(wallet1, asset2) != 10 ||
+		walletBalance(wallet2, asset2) != 20 ||
+		walletBalance(wallet3, asset2) != 10 ||
+		walletInOrder(wallet3, asset2) != 20 {
 		t.Fatal("invalid result")
 	}
 
 	// --------------------------------------
 
-	if walletBalance(wallet1, asset1) != 0 {
-		t.Fatal("invalid result")
-	}
-	if walletBalance(wallet2, asset1) != 0 {
-		t.Fatal("invalid result")
-	}
-	if walletBalance(wallet3, asset1) != 2 {
+	if walletBalance(wallet1, asset1) != 0 ||
+		walletBalance(wallet2, asset1) != 0 ||
+		walletBalance(wallet3, asset1) != 2 {
 		t.Fatal("invalid result")
 	}
 }
@@ -878,49 +836,29 @@ func TestLimitSellWithSelfDone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if processor.partial.ID() != "1" {
-		t.Fatalf("invalid result")
-	}
-	if processor.partial.Quantity().(tFloat64) != 1 {
-		t.Fatalf("invalid result")
-	}
-	if processor.done != 2 {
-		t.Fatalf("invalid result")
-	}
-	if processor.priceDone != 30 {
-		t.Fatalf("invalid result")
-	}
-	if processor.qtyDone != 2 {
-		t.Fatalf("invalid result")
-	}
-	if engine.bids.prices["10"].volume.(tFloat64) != 1 {
+	if processor.partial.ID() != "1" ||
+		processor.partial.Quantity().(tFloat64) != 1 ||
+		processor.done != 2 ||
+		processor.priceDone != 30 ||
+		processor.qtyDone != 2 ||
+		engine.bids.prices["10"].volume.(tFloat64) != 1 {
 		t.Fatalf("invalid result")
 	}
 
 	// --------------------------------------
 
-	if walletBalance(wallet1, asset1) != 1 {
-		t.Fatal("invalid result")
-	}
-	if walletBalance(wallet2, asset1) != 1 {
-		t.Fatal("invalid result")
-	}
-	if walletBalance(wallet3, asset1) != 0 {
+	if walletBalance(wallet1, asset1) != 1 ||
+		walletBalance(wallet2, asset1) != 1 ||
+		walletBalance(wallet3, asset1) != 0 {
 		t.Fatal("invalid result")
 	}
 
 	// --------------------------------------
 
-	if walletBalance(wallet1, asset2) != 0 {
-		t.Fatal("invalid result")
-	}
-	if walletInOrder(wallet1, asset2) != 10 {
-		t.Fatal("invalid result")
-	}
-	if walletBalance(wallet2, asset2) != 0 {
-		t.Fatal("invalid result")
-	}
-	if walletBalance(wallet3, asset2) != 30 {
+	if walletBalance(wallet1, asset2) != 0 ||
+		walletInOrder(wallet1, asset2) != 10 ||
+		walletBalance(wallet2, asset2) != 0 ||
+		walletBalance(wallet3, asset2) != 30 {
 		t.Fatal("invalid result")
 	}
 }
@@ -970,49 +908,29 @@ func TestLimitBuyWithSelfDone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if processor.partial.ID() != "2" {
-		t.Fatalf("invalid result")
-	}
-	if processor.partial.Quantity().(tFloat64) != 1 {
-		t.Fatalf("invalid result")
-	}
-	if processor.done != 2 {
-		t.Fatalf("invalid result")
-	}
-	if processor.priceDone != 30 {
-		t.Fatalf("invalid result")
-	}
-	if processor.qtyDone != 2 {
-		t.Fatalf("invalid result")
-	}
-	if engine.asks.prices["20"].volume.(tFloat64) != 1 {
+	if processor.partial.ID() != "2" ||
+		processor.partial.Quantity().(tFloat64) != 1 ||
+		processor.done != 2 ||
+		processor.priceDone != 30 ||
+		processor.qtyDone != 2 ||
+		engine.asks.prices["20"].volume.(tFloat64) != 1 {
 		t.Fatalf("invalid result")
 	}
 
 	// --------------------------------------
 
-	if walletBalance(wallet1, asset2) != 10 {
-		t.Fatal("invalid result")
-	}
-	if walletBalance(wallet2, asset2) != 20 {
-		t.Fatal("invalid result")
-	}
-	if walletBalance(wallet3, asset2) != 30 {
+	if walletBalance(wallet1, asset2) != 10 ||
+		walletBalance(wallet2, asset2) != 20 ||
+		walletBalance(wallet3, asset2) != 30 {
 		t.Fatal("invalid result")
 	}
 
 	// --------------------------------------
 
-	if walletBalance(wallet1, asset1) != 0 {
-		t.Fatal("invalid result")
-	}
-	if walletBalance(wallet2, asset1) != 0 {
-		t.Fatal("invalid result")
-	}
-	if walletInOrder(wallet2, asset1) != 1 {
-		t.Fatal("invalid result")
-	}
-	if walletBalance(wallet3, asset1) != 2 {
+	if walletBalance(wallet1, asset1) != 0 ||
+		walletBalance(wallet2, asset1) != 0 ||
+		walletInOrder(wallet2, asset1) != 1 ||
+		walletBalance(wallet3, asset1) != 2 {
 		t.Fatal("invalid result")
 	}
 }

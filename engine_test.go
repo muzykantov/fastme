@@ -841,25 +841,17 @@ func TestLimitSellWithSelfDone(t *testing.T) {
 		processor.done != 2 ||
 		processor.priceDone != 30 ||
 		processor.qtyDone != 2 ||
-		engine.bids.prices["10"].volume.(tFloat64) != 1 {
-		t.Fatalf("invalid result")
-	}
-
-	// --------------------------------------
-
-	if walletBalance(wallet1, asset1) != 1 ||
+		engine.bids.prices["10"].volume.(tFloat64) != 1 ||
+		//---------------
+		walletBalance(wallet1, asset1) != 1 ||
 		walletBalance(wallet2, asset1) != 1 ||
-		walletBalance(wallet3, asset1) != 0 {
-		t.Fatal("invalid result")
-	}
-
-	// --------------------------------------
-
-	if walletBalance(wallet1, asset2) != 0 ||
+		walletBalance(wallet3, asset1) != 0 ||
+		//---------------
+		walletBalance(wallet1, asset2) != 0 ||
 		walletInOrder(wallet1, asset2) != 10 ||
 		walletBalance(wallet2, asset2) != 0 ||
 		walletBalance(wallet3, asset2) != 30 {
-		t.Fatal("invalid result")
+		t.Fatalf("invalid result")
 	}
 }
 

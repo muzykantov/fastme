@@ -235,6 +235,12 @@ func updateWalletInOrder(w *tWallet, a Asset, value float64) {
 
 // -----------------------------------------------------------
 
+func assertErr(t *testing.T, err error) {
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestAddToOrderBookSellAndCancel(t *testing.T) {
 	var (
 		asset1, asset2 = Asset("apples"), Asset("dollars")
@@ -754,15 +760,9 @@ func TestLimitBuy(t *testing.T) {
 	updateWalletBalance(wallet2, asset1, 1)
 	updateWalletBalance(wallet3, asset2, 60)
 
-	if err := engine.PlaceOrder(context.Background(), processor, order1); err != nil {
-		t.Fatal(err)
-	}
-	if err := engine.PlaceOrder(context.Background(), processor, order2); err != nil {
-		t.Fatal(err)
-	}
-	if err := engine.PlaceOrder(context.Background(), processor, order3); err != nil {
-		t.Fatal(err)
-	}
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order1))
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order2))
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order3))
 
 	if processor.partial.ID() != "3" ||
 		processor.partial.Quantity().(tFloat64) != 1 ||
@@ -826,15 +826,9 @@ func TestLimitSellWithSelfDone(t *testing.T) {
 	updateWalletBalance(wallet2, asset2, 20)
 	updateWalletBalance(wallet3, asset1, 2)
 
-	if err := engine.PlaceOrder(context.Background(), processor, order1); err != nil {
-		t.Fatal(err)
-	}
-	if err := engine.PlaceOrder(context.Background(), processor, order2); err != nil {
-		t.Fatal(err)
-	}
-	if err := engine.PlaceOrder(context.Background(), processor, order3); err != nil {
-		t.Fatal(err)
-	}
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order1))
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order2))
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order3))
 
 	if processor.partial.ID() != "1" ||
 		processor.partial.Quantity().(tFloat64) != 1 ||
@@ -890,15 +884,9 @@ func TestLimitBuyWithSelfDone(t *testing.T) {
 	updateWalletBalance(wallet2, asset1, 2)
 	updateWalletBalance(wallet3, asset2, 60)
 
-	if err := engine.PlaceOrder(context.Background(), processor, order1); err != nil {
-		t.Fatal(err)
-	}
-	if err := engine.PlaceOrder(context.Background(), processor, order2); err != nil {
-		t.Fatal(err)
-	}
-	if err := engine.PlaceOrder(context.Background(), processor, order3); err != nil {
-		t.Fatal(err)
-	}
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order1))
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order2))
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order3))
 
 	if processor.partial.ID() != "2" ||
 		processor.partial.Quantity().(tFloat64) != 1 ||

@@ -1,4 +1,4 @@
-# fastme (fast matching engine) library
+# fastme (fast golang matching engine) library
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/newity/fastme)](https://goreportcard.com/report/github.com/newity/fastme)
 

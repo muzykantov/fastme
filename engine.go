@@ -225,15 +225,14 @@ func (e *Engine) Orders() (orders []Order) {
 }
 
 // OrderBook returns information about volume and price for definite price level
-func (e *Engine) OrderBook(iter func(as bool, price, volume Value, len int)) {
-	
+func (e *Engine) OrderBook(iter func(asks bool, price, volume Value, len int)) {
 	e.m.Lock()
 	defer e.m.Unlock()
 
-	level := e.as.maxPrice()
+	level := e.asks.maxPrice()
 	for level != nil {
 		iter(true, level.price, level.volume, level.orders.Len())
-		level = e.as.lessThan(level.price)
+		level = e.asks.lessThan(level.price)
 	}
 
 	level = e.bids.maxPrice()
@@ -241,6 +240,8 @@ func (e *Engine) OrderBook(iter func(as bool, price, volume Value, len int)) {
 		iter(false, level.price, level.volume, level.orders.Len())
 		level = e.bids.lessThan(level.price)
 	}
+
+	return
 }
 
 // ----------------------------------------------------------

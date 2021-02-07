@@ -32,10 +32,10 @@ func (t tFloat64) Cmp(n Value) int {
 	switch {
 	case t > num:
 		return 1
-	
+
 	case t < num:
 		return -1
-	
+
 	}
 
 	return 0
@@ -46,10 +46,10 @@ func (t tFloat64) Sign() int {
 	switch {
 	case t < 0:
 		return -1
-	
+
 	case t > 0:
 		return 1
-	
+
 	}
 
 	return 0
@@ -259,38 +259,6 @@ func TestAddToOrderBookSellAndCancel(t *testing.T) {
 			1,
 			10,
 		)
-
-		order2 = newOrder(
-			"2",
-			wallet1,
-			true,
-			2,
-			11,
-		)
-
-		order3 = newOrder(
-			"3",
-			wallet1,
-			true,
-			11,
-			8,
-		)
-
-		order1 = newOrder(
-			"1",
-			wallet1,
-			true,
-			12,
-			12,
-		)
-
-		order1 = newOrder(
-			"1",
-			wallet1,
-			true,
-			9,
-			20,
-		)
 	)
 
 	updateWalletBalance(wallet1, asset1, 10)
@@ -331,46 +299,6 @@ func TestAddToOrderBookBuyAndCancel(t *testing.T) {
 			false,
 			1,
 			10,
-		)
-
-		order2 = newOrder(
-			"2",
-			wallet1,
-			false,
-			5,
-			3,
-		)
-
-		order3 = newOrder(
-			"3",
-			wallet1,
-			false,
-			7,
-			9,
-		)
-
-		order4 = newOrder(
-			"4",
-			wallet1,
-			false,
-			1,
-			3,
-		)
-
-		order5 = newOrder(
-			"5",
-			wallet1,
-			false,
-			1,
-			2,
-		)
-
-		order3 = newOrder(
-			"6",
-			wallet1,
-			false,
-			14,
-			9,
 		)
 	)
 

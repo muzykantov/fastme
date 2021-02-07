@@ -339,8 +339,9 @@ func (e *Engine) quantity(sell bool, priceLim Value) Value {
 	}
 
 	for level != nil {
-		if (sell && level.price.Cmp(priceLim) < 0) ||
-			(!sell && level.price.Cmp(priceLim) > 0) {
+		if priceLim != nil &&
+			((sell && level.price.Cmp(priceLim) < 0) ||
+				(!sell && level.price.Cmp(priceLim) > 0)) {
 			break
 		}
 

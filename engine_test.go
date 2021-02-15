@@ -919,6 +919,108 @@ func TestLimitBuyWithSelfDone(t *testing.T) {
 	}
 }
 
+func TestOrderReplaceSell(t *testing.T) {
+	var (
+		processor      = newEventListener()
+		asset1, asset2 = Asset("apples"), Asset("dollars")
+		wallet1        = newWallet()
+
+		engine = NewEngine(asset1, asset2)
+
+		order1 = newOrder(
+			"1",
+			wallet1,
+			true,
+			1,
+			10,
+		)
+		order2 = newOrder(
+			"2",
+			wallet1,
+			true,
+			2,
+			20,
+		)
+		order3 = newOrder(
+			"3",
+			wallet1,
+			true,
+			1,
+			20,
+		)
+	)
+
+	updateWalletBalance(wallet1, asset1, 3)
+
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order1))
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order2))
+
+	assertErr(t, engine.ReplaceOrder(context.Background(), processor, order2, order3))
+
+	// --------------------------------------
+
+	if walletBalance(wallet1, asset1) != 1 {
+		t.Fatal("invalid result")
+	}
+
+	// --------------------------------------
+
+	if walletInOrder(wallet1, asset1) != 2 {
+		t.Fatal("invalid result")
+	}
+}
+
+func TestOrderReplaceBuy(t *testing.T) {
+	var (
+		processor      = newEventListener()
+		asset1, asset2 = Asset("apples"), Asset("dollars")
+		wallet1        = newWallet()
+
+		engine = NewEngine(asset1, asset2)
+
+		order1 = newOrder(
+			"1",
+			wallet1,
+			false,
+			1,
+			10,
+		)
+		order2 = newOrder(
+			"2",
+			wallet1,
+			false,
+			2,
+			20,
+		)
+		order3 = newOrder(
+			"3",
+			wallet1,
+			false,
+			1,
+			20,
+		)
+	)
+
+	updateWalletBalance(wallet1, asset2, 50)
+
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order1))
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order2))
+
+	assertErr(t, engine.ReplaceOrder(context.Background(), processor, order2, order3))
+
+	// --------------------------------------
+
+	if walletBalance(wallet1, asset2) != 20 {
+		t.Fatal("invalid result")
+	}
+
+	// --------------------------------------
+
+	if walletInOrder(wallet1, asset2) != 30 {
+		t.Fatal("invalid result")
+	}
+}
+
 func BenchmarkOrderProcessung(b *testing.B) {
 	var (
 		asset1, asset2 = Asset("apples"), Asset("dollars")

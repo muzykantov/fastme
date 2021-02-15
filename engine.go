@@ -9,8 +9,9 @@ import (
 
 // Fast matching engine errors
 var (
-	ErrInvalidQuantity      = errors.New("Quantity could not be less or equal zero")
-	ErrInvalidPrice         = errors.New("Price could not be less zero")
+	ErrInvalidQuantity      = errors.New("Invalid order quantity")
+	ErrInvalidPrice         = errors.New("Invalid order price")
+	ErrInvalidOrder         = errors.New("Invalid order format")
 	ErrInsufficientQuantity = errors.New("Insufficient quantity to calculate market price")
 	ErrInsufficientFunds    = errors.New("Insufficient funds to process order")
 	ErrOrderExists          = errors.New("Order with given ID already exists")
@@ -56,11 +57,11 @@ func (e *Engine) PlaceOrder(ctx context.Context, listener EventListener, o Order
 	defer e.m.Unlock()
 
 	if listener == nil {
-		listener = new(emptyListener)
+		listener = emptyListenerValue
 	}
 
 	if e.feeHandler == nil {
-		e.feeHandler = new(emptyFeeHandler)
+		e.feeHandler = emptyFeeHandlerValue
 	}
 
 	if o.Quantity().Sign() <= 0 {
@@ -121,13 +122,105 @@ func (e *Engine) PlaceOrder(ctx context.Context, listener EventListener, o Order
 	return nil
 }
 
+// ReplaceOrder replaces order at the same price level without queue loss
+func (e *Engine) ReplaceOrder(ctx context.Context, listener EventListener, o, n Order) error {
+	e.m.Lock()
+	defer e.m.Unlock()
+
+	orderEl, ok := e.orders[o.ID()]
+	if !ok {
+		return ErrOrderNotFound
+	}
+
+	o, ok = orderEl.Value.(Order)
+	if !ok {
+		return ErrInvalidOrder
+	}
+
+	if o.Owner() != n.Owner() {
+		return ErrInvalidOrder
+	}
+
+	if o.Sell() != n.Sell() {
+		return ErrInvalidOrder
+	}
+
+	if o.Price().Cmp(n.Price()) != 0 {
+		return ErrInvalidOrder
+	}
+
+	if o.Quantity().Sign() <= 0 {
+		return ErrInvalidQuantity
+	}
+
+	if listener == nil {
+		listener = emptyListenerValue
+	}
+
+	var (
+		wallet     = o.Owner()
+		asset      Asset
+		newBalance Value
+		newInOrder Value
+		oldValue   Value
+		newValue   Value
+		orderSide  *side
+	)
+
+	if o.Sell() {
+		orderSide = e.asks
+		asset = e.base
+		oldValue = o.Quantity()
+		newValue = n.Quantity()
+	} else {
+		orderSide = e.bids
+		asset = e.quote
+		oldValue = o.Price().Mul(o.Quantity())
+		newValue = n.Price().Mul(n.Quantity())
+	}
+
+	newBalance = oldValue.
+		Sub(newValue).
+		Add(wallet.Balance(ctx, asset))
+
+	if newBalance.Sign() < 0 {
+		return ErrInsufficientFunds
+	}
+
+	queue, ok := orderSide.prices[n.Price().Hash()]
+	if !ok {
+		return ErrInvalidPrice
+	}
+
+	newInOrder = newValue.
+		Sub(oldValue).
+		Add(wallet.InOrder(ctx, asset))
+
+	orderEl.Value = n
+
+	delete(e.orders, o.ID())
+	e.orders[n.ID()] = orderEl
+
+	queue.volume = n.Quantity().
+		Sub(o.Quantity()).
+		Add(queue.volume)
+
+	wallet.UpdateBalance(ctx, asset, newBalance)
+	listener.OnBalanceChanged(ctx, wallet, asset, newBalance)
+
+	wallet.UpdateInOrder(ctx, asset, newInOrder)
+	listener.OnInOrderChanged(ctx, wallet, asset, newInOrder)
+
+	return nil
+}
+
 // CancelOrder removes order from the order book and refund assets to the owner
 func (e *Engine) CancelOrder(ctx context.Context, listener EventListener, o Order) {
 	e.m.Lock()
 	defer e.m.Unlock()
 
 	if listener == nil {
-		listener = &emptyListener{}
+		listener = emptyListenerValue
 	}
 
 	e.pull(ctx, o)
@@ -585,6 +678,8 @@ func (l *emptyListener) OnExistingOrderCanceled(context.Context, Order)         
 func (l *emptyListener) OnBalanceChanged(context.Context, Wallet, Asset, Value) {}
 func (l *emptyListener) OnInOrderChanged(context.Context, Wallet, Asset, Value) {}
 
+var emptyListenerValue = new(emptyListener)
+
 type emptyFeeHandler struct{}
 
 func (h *emptyFeeHandler) HandleFeeMaker(ctx context.Context, o Order, a Asset, in Value) (out Value) {
@@ -594,6 +689,8 @@ func (h *emptyFeeHandler) HandleFeeMaker(ctx context.Context, o Order, a Asset, 
 func (h *emptyFeeHandler) HandleFeeTaker(ctx context.Context, o Order, a Asset, in Value) (out Value) {
 	return in
 }
+
+var emptyFeeHandlerValue = new(emptyFeeHandler)
 
 // ----------------------------------------------------------
 // Order queue implementation

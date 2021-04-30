@@ -9,13 +9,13 @@ import (
 
 // Fast matching engine errors
 var (
-	ErrInvalidQuantity      = errors.New("Invalid order quantity")
-	ErrInvalidPrice         = errors.New("Invalid order price")
-	ErrInvalidOrder         = errors.New("Invalid order format")
-	ErrInsufficientQuantity = errors.New("Insufficient quantity to calculate market price")
-	ErrInsufficientFunds    = errors.New("Insufficient funds to process order")
-	ErrOrderExists          = errors.New("Order with given ID already exists")
-	ErrOrderNotFound        = errors.New("Order with given ID not found")
+	ErrInvalidQuantity      = errors.New("invalid order quantity")
+	ErrInvalidPrice         = errors.New("invalid order price")
+	ErrInvalidOrder         = errors.New("invalid order format")
+	ErrInsufficientQuantity = errors.New("insufficient quantity to calculate market price")
+	ErrInsufficientFunds    = errors.New("insufficient funds to process order")
+	ErrOrderExists          = errors.New("order with given ID already exists")
+	ErrOrderNotFound        = errors.New("order with given ID not found")
 )
 
 // Engine implements fast matching engine
@@ -333,8 +333,6 @@ func (e *Engine) OrderBook(iter func(asks bool, price, volume Value, len int)) {
 		iter(false, level.price, level.volume, level.orders.Len())
 		level = e.bids.lessThan(level.price)
 	}
-
-	return
 }
 
 // ----------------------------------------------------------

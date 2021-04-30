@@ -173,8 +173,6 @@ func (t *tOrder) UpdateQuantity(v Value) {
 // -----------------------------------------------------------
 
 type tEventListener struct {
-	incoming  Volume
-	existing  Volume
 	done      uint64
 	priceDone tFloat64
 	qtyDone   tFloat64
@@ -231,10 +229,6 @@ func updateWalletBalance(w *tWallet, a Asset, value float64) {
 
 func walletInOrder(w *tWallet, a Asset) float64 {
 	return float64(w.InOrder(context.Background(), a).(tFloat64))
-}
-
-func updateWalletInOrder(w *tWallet, a Asset, value float64) {
-	w.UpdateInOrder(context.Background(), a, tFloat64(value))
 }
 
 // -----------------------------------------------------------

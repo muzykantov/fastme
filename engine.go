@@ -9,13 +9,24 @@ import (
 
 // Fast matching engine errors
 var (
-	ErrInvalidQuantity      = errors.New("invalid order quantity")
-	ErrInvalidPrice         = errors.New("invalid order price")
-	ErrInvalidOrder         = errors.New("invalid order format")
-	ErrInsufficientQuantity = errors.New("insufficient quantity to calculate market price")
-	ErrInsufficientFunds    = errors.New("insufficient funds to process order")
-	ErrOrderExists          = errors.New("order with given ID already exists")
-	ErrOrderNotFound        = errors.New("order with given ID not found")
+	//lint:ignore ST1005 for backward compatibility
+	ErrInvalidQuantity = errors.New("Invalid order quantity")
+
+	//lint:ignore ST1005 for backward compatibility
+	ErrInvalidPrice = errors.New("Invalid order price")
+
+	//lint:ignore ST1005 for backward compatibility
+	ErrInvalidOrder = errors.New("Invalid order format")
+
+	//lint:ignore ST1005 for backward compatibility
+	ErrInsufficientQuantity = errors.New("Insufficient quantity to calculate market price")
+
+	//lint:ignore ST1005 for backward compatibility
+	ErrInsufficientFunds = errors.New("Insufficient funds to process order")
+
+	ErrOrderExists = errors.New("Order with given ID already exists")
+
+	ErrOrderNotFound = errors.New("Order with given ID not found")
 )
 
 // Engine implements fast matching engine

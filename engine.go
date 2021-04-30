@@ -396,8 +396,8 @@ func (e *Engine) processQueue(ctx context.Context, listener EventListener, q *qu
 			return qtyLeft.Sub(qtyLeft)
 		}
 
-		o.UpdateQuantity(oq.Sub(oq))
 		e.pull(ctx, o)
+		o.UpdateQuantity(oq.Sub(oq))
 
 		volume := Volume{
 			Quantity: oq,

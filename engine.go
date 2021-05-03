@@ -199,7 +199,7 @@ func (e *Engine) ReplaceOrder(
 		return ErrInvalidOrder
 	}
 
-	if o.Quantity().Sign() <= 0 {
+	if n.Quantity().Sign() <= 0 {
 		return ErrInvalidQuantity
 	}
 

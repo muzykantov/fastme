@@ -62,8 +62,53 @@ func (e *Engine) SetFeeHandler(h FeeHandler) {
 	e.m.Unlock()
 }
 
+// CanPlace calculates balance and retuns an error if is not enought money
+// to place an order with given params
+func (e *Engine) CanPlace(
+	ctx context.Context,
+	w Wallet,
+	sell bool,
+	quantity, price Value,
+) error {
+	if quantity == nil || quantity.Sign() <= 0 {
+		return ErrInvalidQuantity
+	}
+
+	if price == nil || price.Sign() < 0 {
+		return ErrInvalidPrice
+	}
+
+	var (
+		marketPrice Value
+		err         error
+	)
+	if price.Sign() == 0 {
+		if marketPrice, err = e.price(sell, quantity); err != nil {
+			return err
+		}
+	} else {
+		marketPrice = price.Mul(quantity)
+	}
+
+	if sell {
+		if w == nil || w.Balance(ctx, e.base).Cmp(quantity) < 0 {
+			return ErrInsufficientFunds
+		}
+	} else {
+		if w == nil || w.Balance(ctx, e.quote).Cmp(marketPrice) < 0 {
+			return ErrInsufficientFunds
+		}
+	}
+
+	return nil
+}
+
 // PlaceOrder order adds the order to the order book and solves exchange task
-func (e *Engine) PlaceOrder(ctx context.Context, listener EventListener, o Order) (err error) {
+func (e *Engine) PlaceOrder(
+	ctx context.Context,
+	listener EventListener,
+	o Order,
+) (err error) {
 	e.m.Lock()
 	defer e.m.Unlock()
 
@@ -75,45 +120,35 @@ func (e *Engine) PlaceOrder(ctx context.Context, listener EventListener, o Order
 		e.feeHandler = emptyFeeHandlerValue
 	}
 
-	if o.Quantity().Sign() <= 0 {
-		return ErrInvalidQuantity
-	}
-
-	if o.Price().Sign() < 0 {
-		return ErrInvalidPrice
-	}
-
 	if _, ok := e.orders[o.ID()]; ok {
 		return ErrOrderExists
 	}
 
-	var marketPrice Value
-	if o.Price().Sign() == 0 {
-		if marketPrice, err = e.price(o.Sell(), o.Quantity()); err != nil {
-			return err
-		}
-	} else {
-		marketPrice = o.Price().Mul(o.Quantity())
+	if err := e.CanPlace(
+		ctx,
+		o.Owner(),
+		o.Sell(),
+		o.Quantity(),
+		o.Price(),
+	); err != nil {
+		return err
 	}
 
-	if o.Sell() {
-		if o.Owner().Balance(ctx, e.base).Cmp(o.Quantity()) < 0 {
-			return ErrInsufficientFunds
-		}
-	} else {
-		if o.Owner().Balance(ctx, e.quote).Cmp(marketPrice) < 0 {
-			return ErrInsufficientFunds
-		}
-	}
-
-	if prcDone, qtyLeft := e.processSide(ctx, listener, o.Sell(), o.Quantity(), o.Price()); prcDone != nil {
+	if prcDone, qtyLeft := e.processSide(
+		ctx,
+		listener,
+		o.Sell(),
+		o.Quantity(),
+		o.Price(),
+	); prcDone != nil {
 		volume := Volume{
 			Price:    prcDone,
 			Quantity: o.Quantity().Sub(qtyLeft),
 		}
 
 		e.decBalance(ctx, listener, o, volume.Quantity, volume.Price)
-		e.incBalance(ctx, listener, o, volume.Quantity, volume.Price, e.feeHandler.HandleFeeTaker)
+		e.incBalance(ctx, listener, o, volume.Quantity, volume.Price,
+			e.feeHandler.HandleFeeTaker)
 
 		o.UpdateQuantity(qtyLeft)
 
@@ -134,7 +169,11 @@ func (e *Engine) PlaceOrder(ctx context.Context, listener EventListener, o Order
 }
 
 // ReplaceOrder replaces order at the same price level without queue loss
-func (e *Engine) ReplaceOrder(ctx context.Context, listener EventListener, o, n Order) error {
+func (e *Engine) ReplaceOrder(
+	ctx context.Context,
+	listener EventListener,
+	o, n Order,
+) error {
 	e.m.Lock()
 	defer e.m.Unlock()
 
@@ -226,7 +265,11 @@ func (e *Engine) ReplaceOrder(ctx context.Context, listener EventListener, o, n 
 }
 
 // CancelOrder removes order from the order book and refund assets to the owner
-func (e *Engine) CancelOrder(ctx context.Context, listener EventListener, o Order) {
+func (e *Engine) CancelOrder(
+	ctx context.Context,
+	listener EventListener,
+	o Order,
+) {
 	e.m.Lock()
 	defer e.m.Unlock()
 
@@ -348,7 +391,12 @@ func (e *Engine) OrderBook(iter func(asks bool, price, volume Value, len int)) {
 
 // ----------------------------------------------------------
 
-func (e *Engine) processSide(ctx context.Context, listener EventListener, sell bool, quantity, priceLim Value) (priceDone, qtyLeft Value) {
+func (e *Engine) processSide(
+	ctx context.Context,
+	listener EventListener,
+	sell bool,
+	quantity, priceLim Value,
+) (priceDone, qtyLeft Value) {
 	qtyLeft = quantity
 
 	var (
@@ -383,7 +431,12 @@ func (e *Engine) processSide(ctx context.Context, listener EventListener, sell b
 	return
 }
 
-func (e *Engine) processQueue(ctx context.Context, listener EventListener, q *queue, quantity Value) (qtyLeft Value) {
+func (e *Engine) processQueue(
+	ctx context.Context,
+	listener EventListener,
+	q *queue,
+	quantity Value,
+) (qtyLeft Value) {
 	qtyLeft = quantity
 
 	for q.orders.Len() > 0 && qtyLeft.Sign() > 0 {
@@ -400,9 +453,20 @@ func (e *Engine) processQueue(ctx context.Context, listener EventListener, q *qu
 				Price:    op.Mul(qtyLeft),
 			}
 
-			e.incBalance(ctx, listener, o, volume.Quantity, volume.Price, e.feeHandler.HandleFeeMaker)
+			e.incBalance(
+				ctx,
+				listener,
+				o,
+				volume.Quantity,
+				volume.Price,
+				e.feeHandler.HandleFeeMaker,
+			)
 
-			listener.OnExistingOrderPartial(ctx, q.update(ctx, el, oq.Sub(qtyLeft)), volume)
+			listener.OnExistingOrderPartial(
+				ctx,
+				q.update(ctx, el, oq.Sub(qtyLeft)),
+				volume,
+			)
 
 			return qtyLeft.Sub(qtyLeft)
 		}
@@ -415,7 +479,14 @@ func (e *Engine) processQueue(ctx context.Context, listener EventListener, q *qu
 			Price:    op.Mul(oq),
 		}
 
-		e.incBalance(ctx, listener, o, volume.Quantity, volume.Price, e.feeHandler.HandleFeeMaker)
+		e.incBalance(
+			ctx,
+			listener,
+			o,
+			volume.Quantity,
+			volume.Price,
+			e.feeHandler.HandleFeeMaker,
+		)
 
 		listener.OnExistingOrderDone(ctx, o, volume)
 
@@ -486,7 +557,12 @@ func (e *Engine) price(sell bool, quantity Value) (Value, error) {
 	return price, nil
 }
 
-func (e *Engine) incBalance(ctx context.Context, listener EventListener, o Order, quantity, price Value, handleFee func(context.Context, Order, Asset, Value) (out Value)) {
+func (e *Engine) incBalance(
+	ctx context.Context,
+	listener EventListener,
+	o Order, quantity, price Value,
+	handleFee func(context.Context, Order, Asset, Value) (out Value),
+) {
 	var (
 		wallet             = o.Owner()
 		assetInc, assetDec Asset
@@ -516,7 +592,12 @@ func (e *Engine) incBalance(ctx context.Context, listener EventListener, o Order
 	listener.OnInOrderChanged(ctx, wallet, assetDec, valInOrder)
 }
 
-func (e *Engine) decBalance(ctx context.Context, listener EventListener, o Order, quantity, price Value) {
+func (e *Engine) decBalance(
+	ctx context.Context,
+	listener EventListener,
+	o Order,
+	quantity, price Value,
+) {
 	var (
 		wallet = o.Owner()
 		asset  Asset
@@ -691,11 +772,20 @@ var emptyListenerValue = new(emptyListener)
 
 type emptyFeeHandler struct{}
 
-func (h *emptyFeeHandler) HandleFeeMaker(ctx context.Context, o Order, a Asset, in Value) (out Value) {
+func (h *emptyFeeHandler) HandleFeeMaker(
+	ctx context.Context,
+	o Order,
+	a Asset,
+	in Value,
+) (out Value) {
 	return in
 }
 
-func (h *emptyFeeHandler) HandleFeeTaker(ctx context.Context, o Order, a Asset, in Value) (out Value) {
+func (h *emptyFeeHandler) HandleFeeTaker(ctx context.Context,
+	o Order,
+	a Asset,
+	in Value,
+) (out Value) {
 	return in
 }
 

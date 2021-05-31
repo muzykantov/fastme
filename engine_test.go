@@ -1370,3 +1370,137 @@ func TestRedBlackTreePut(t *testing.T) {
 	tree.put("b", "2")
 	tree.put("a", "1")
 }
+
+func TestOrderBookQuantity(t *testing.T) {
+	var (
+		processor                 = newEventListener()
+		asset1, asset2            = Asset("apples"), Asset("dollars")
+		wallet1, wallet2, wallet3 = newWallet(), newWallet(), newWallet()
+
+		engine = NewEngine(asset1, asset2)
+
+		order1 = newOrder(
+			"1",
+			wallet1,
+			false,
+			5,
+			10,
+		)
+		order2 = newOrder(
+			"2",
+			wallet1,
+			false,
+			2,
+			20,
+		)
+		order3 = newOrder(
+			"3",
+			wallet2,
+			true,
+			6,
+			10,
+		)
+		order4 = newOrder(
+			"4",
+			wallet2,
+			true,
+			1,
+			20,
+		)
+	)
+
+	updateWalletBalance(wallet1, asset2, 200)
+	updateWalletBalance(wallet2, asset1, 30)
+	updateWalletBalance(wallet3, asset1, 10)
+	updateWalletBalance(wallet3, asset2, 100)
+
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order1))
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order2))
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order3))
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order4))
+
+	// -------------
+
+	if walletBalance(wallet1, asset1) != 6 ||
+		walletBalance(wallet1, asset2) != 110 ||
+		walletBalance(wallet2, asset1) != 23 ||
+		walletBalance(wallet2, asset2) != 80 ||
+		// -------------
+		walletInOrder(wallet1, asset1) != 0 ||
+		walletInOrder(wallet1, asset2) != 10 ||
+		walletInOrder(wallet2, asset1) != 1 ||
+		walletInOrder(wallet2, asset2) != 0 {
+		t.Fatal("invalid result")
+	}
+
+	if vol, _ := engine.Quantity(true, nil).(tFloat64); vol != 1 {
+		t.Fatal("purchase Quantity: invalid result")
+	}
+
+	if vol, _ := engine.Quantity(false, nil).(tFloat64); vol != 1 {
+		t.Fatal("sale Quantity: invalid result")
+	}
+
+	var (
+		order5 = newOrder(
+			"5",
+			wallet1,
+			false,
+			4,
+			15,
+		)
+		order6 = newOrder(
+			"6",
+			wallet2,
+			true,
+			6,
+			40,
+		)
+		order7 = newOrder(
+			"7",
+			wallet3,
+			false,
+			1,
+			0,
+		)
+		order8 = newOrder(
+			"8",
+			wallet3,
+			true,
+			1,
+			0,
+		)
+	)
+
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order5))
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order6))
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order7))
+	assertErr(t, engine.PlaceOrder(context.Background(), processor, order8))
+
+	//-------------
+
+	if walletBalance(wallet1, asset1) != 7 ||
+		walletBalance(wallet1, asset2) != 50 ||
+		walletBalance(wallet2, asset1) != 17 ||
+		walletBalance(wallet2, asset2) != 100 ||
+		walletBalance(wallet3, asset1) != 10 ||
+		walletBalance(wallet3, asset2) != 95 ||
+		// -------------
+		walletInOrder(wallet1, asset1) != 0 ||
+		walletInOrder(wallet1, asset2) != 55 ||
+		walletInOrder(wallet2, asset1) != 6 ||
+		walletInOrder(wallet2, asset2) != 0 ||
+		walletInOrder(wallet3, asset1) != 0 ||
+		walletInOrder(wallet3, asset2) != 0 {
+		t.Fatal("invalid result")
+	}
+
+	if vol, _ := engine.Quantity(true, nil).(tFloat64); vol != 4 {
+		t.Fatal("purchase Quantity: invalid result")
+	}
+
+	if vol, _ := engine.Quantity(false, nil).(tFloat64); vol != 6 {
+		t.Fatal("sale Quantity: invalid result")
+	}
+
+}

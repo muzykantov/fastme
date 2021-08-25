@@ -51,6 +51,13 @@ func NewEngine(base, quote Asset) *Engine {
 	}
 }
 
+// NewEngineWithFeeHandler creates fast matching engine implementation
+func NewEngineWithFeeHandler(base, quote Asset, h FeeHandler) (me *Engine) {
+	me = NewEngine(base, quote)
+	me.SetFeeHandler(h)
+	return
+}
+
 // ----------------------------------------------------------
 // Matching engine implementation
 // ----------------------------------------------------------

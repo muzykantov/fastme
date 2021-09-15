@@ -144,9 +144,7 @@ func (e *Engine) PlaceOrder(
 	if prcDone, qtyLeft := e.processSide(
 		ctx,
 		listener,
-		o.Sell(),
-		o.Quantity(),
-		o.Price(),
+		o,
 	); prcDone != nil {
 		volume := Volume{
 			Price:    prcDone,
@@ -401,29 +399,28 @@ func (e *Engine) OrderBook(iter func(asks bool, price, volume Value, len int)) {
 func (e *Engine) processSide(
 	ctx context.Context,
 	listener EventListener,
-	sell bool,
-	quantity, priceLim Value,
+	incoming Order,
 ) (priceDone, qtyLeft Value) {
-	qtyLeft = quantity
+	qtyLeft = incoming.Quantity()
 
 	var (
 		iter       func() *queue
 		comparator func(Value) bool
 	)
 
-	if sell {
+	if incoming.Sell() {
 		iter = e.bids.maxPrice
 		comparator = func(n Value) bool {
-			return priceLim.Cmp(n) <= 0
+			return incoming.Price().Cmp(n) <= 0
 		}
 	} else {
 		iter = e.asks.minPrice
 		comparator = func(n Value) bool {
-			return priceLim.Cmp(n) >= 0
+			return incoming.Price().Cmp(n) >= 0
 		}
 	}
 
-	if priceLim.Sign() == 0 {
+	if incoming.Price().Sign() == 0 {
 		comparator = func(Value) bool { return true }
 	}
 
@@ -453,6 +450,8 @@ func (e *Engine) processQueue(
 			oq = o.Quantity()
 			op = o.Price()
 		)
+
+		// p.match(ctx, o, incoming)
 
 		if oq.Cmp(qtyLeft) > 0 {
 			volume := Volume{
@@ -501,6 +500,13 @@ func (e *Engine) processQueue(
 	}
 
 	return
+}
+
+func (e *Engine) match(
+	ctx context.Context,
+	maker, taker Order,
+) {
+
 }
 
 func (e *Engine) quantity(sell bool, priceLim Value) Value {

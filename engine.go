@@ -141,36 +141,113 @@ func (e *Engine) PlaceOrder(
 		return err
 	}
 
-	if prcDone, qtyLeft := e.processSide(
-		ctx,
-		listener,
-		o.Sell(),
-		o.Quantity(),
-		o.Price(),
-	); prcDone != nil {
-		volume := Volume{
-			Price:    prcDone,
-			Quantity: o.Quantity().Sub(qtyLeft),
+	var (
+		next    func() *queue
+		compare func(Value) bool
+	)
+
+	if o.Sell() {
+		next = e.bids.maxPrice
+		compare = func(n Value) bool {
+			return o.Price().Cmp(n) <= 0
 		}
-
-		e.decBalance(ctx, listener, o, volume.Quantity, volume.Price)
-		e.incBalance(ctx, listener, o, volume.Quantity, volume.Price,
-			e.feeHandler.HandleFeeTaker)
-
-		o.UpdateQuantity(qtyLeft)
-
-		if qtyLeft.Sign() == 0 {
-			listener.OnIncomingOrderDone(ctx, o, volume)
-			return nil
+	} else {
+		next = e.asks.minPrice
+		compare = func(n Value) bool {
+			return o.Price().Cmp(n) >= 0
 		}
-
-		listener.OnIncomingOrderPartial(ctx, o, volume)
 	}
 
-	e.decBalance(ctx, listener, o, o.Quantity(), o.Quantity().Mul(o.Price()))
-	e.push(ctx, o)
+	if o.Price().Sign() == 0 {
+		compare = func(Value) bool { return true }
+	}
 
-	listener.OnIncomingOrderPlaced(ctx, o)
+	// Side processing
+	bestPriceQueue := next()
+	for bestPriceQueue != nil &&
+		o.Quantity().Sign() > 0 &&
+		compare(bestPriceQueue.price) {
+
+		// Queue processing
+		for bestPriceQueue.orders.Len() > 0 &&
+			o.Quantity().Sign() > 0 {
+			var (
+				makerEl = bestPriceQueue.orders.Front()
+				maker   = makerEl.Value.(Order)
+				taker   = o
+
+				makerQty = maker.Quantity()
+				takerQty = taker.Quantity()
+				volume   Volume
+			)
+
+			// Matching
+			switch taker.Quantity().Cmp(maker.Quantity()) {
+			case 0: // taker qty == maker qty
+				e.pull(ctx, maker)
+				volume = Volume{
+					Price:    makerQty.Mul(maker.Price()),
+					Quantity: makerQty,
+				}
+
+				maker.UpdateQuantity(makerQty.Sub(makerQty))
+				taker.UpdateQuantity(takerQty.Sub(takerQty))
+				listener.OnExistingOrderDone(ctx, maker, volume)
+				listener.OnIncomingOrderDone(ctx, taker, volume)
+
+			case 1: // taker qty > maker qty
+				e.pull(ctx, maker)
+				volume = Volume{
+					Price:    makerQty.Mul(maker.Price()),
+					Quantity: makerQty,
+				}
+
+				maker.UpdateQuantity(makerQty.Sub(makerQty))
+				taker.UpdateQuantity(takerQty.Sub(makerQty))
+				listener.OnExistingOrderDone(ctx, maker, volume)
+				listener.OnIncomingOrderPartial(ctx, taker, volume)
+
+			case -1: // taker qty < maker qty
+				volume = Volume{
+					Price:    takerQty.Mul(maker.Price()),
+					Quantity: takerQty,
+				}
+
+				bestPriceQueue.updateQuantity(
+					ctx,
+					makerEl,
+					makerQty.Sub(takerQty),
+				)
+				taker.UpdateQuantity(takerQty.Sub(takerQty))
+				listener.OnExistingOrderPartial(ctx, maker, volume)
+				listener.OnIncomingOrderDone(ctx, taker, volume)
+			}
+
+			e.updateBalanceOnExchanged(
+				ctx,
+				listener,
+				maker,
+				volume,
+				true,
+			)
+
+			e.updateBalanceOnExchanged(
+				ctx,
+				listener,
+				taker,
+				volume,
+				false,
+			)
+		}
+
+		bestPriceQueue = next()
+	}
+
+	if o.Quantity().Sign() > 0 {
+		e.push(ctx, o)
+		listener.OnIncomingOrderPlaced(ctx, o)
+		e.updateBalanceOnPlaced(ctx, listener, o)
+	}
 
 	return nil
 }
@@ -396,113 +473,6 @@ func (e *Engine) OrderBook(iter func(asks bool, price, volume Value, len int)) {
 	}
 }
 
-// ----------------------------------------------------------
-
-func (e *Engine) processSide(
-	ctx context.Context,
-	listener EventListener,
-	sell bool,
-	quantity, priceLim Value,
-) (priceDone, qtyLeft Value) {
-	qtyLeft = quantity
-
-	var (
-		iter       func() *queue
-		comparator func(Value) bool
-	)
-
-	if sell {
-		iter = e.bids.maxPrice
-		comparator = func(n Value) bool {
-			return priceLim.Cmp(n) <= 0
-		}
-	} else {
-		iter = e.asks.minPrice
-		comparator = func(n Value) bool {
-			return priceLim.Cmp(n) >= 0
-		}
-	}
-
-	if priceLim.Sign() == 0 {
-		comparator = func(Value) bool { return true }
-	}
-
-	bestPrice := iter()
-	for bestPrice != nil && qtyLeft.Sign() > 0 && comparator(bestPrice.price) {
-		lastQty := qtyLeft
-		qtyLeft = e.processQueue(ctx, listener, bestPrice, lastQty)
-		priceDone = lastQty.Sub(qtyLeft).Mul(bestPrice.price).Add(priceDone)
-		bestPrice = iter()
-	}
-
-	return
-}
-
-func (e *Engine) processQueue(
-	ctx context.Context,
-	listener EventListener,
-	q *queue,
-	quantity Value,
-) (qtyLeft Value) {
-	qtyLeft = quantity
-
-	for q.orders.Len() > 0 && qtyLeft.Sign() > 0 {
-		var (
-			el = q.orders.Front()
-			o  = el.Value.(Order)
-			oq = o.Quantity()
-			op = o.Price()
-		)
-
-		if oq.Cmp(qtyLeft) > 0 {
-			volume := Volume{
-				Quantity: qtyLeft,
-				Price:    op.Mul(qtyLeft),
-			}
-
-			e.incBalance(
-				ctx,
-				listener,
-				o,
-				volume.Quantity,
-				volume.Price,
-				e.feeHandler.HandleFeeMaker,
-			)
-
-			listener.OnExistingOrderPartial(
-				ctx,
-				q.update(ctx, el, oq.Sub(qtyLeft)),
-				volume,
-			)
-
-			return qtyLeft.Sub(qtyLeft)
-		}
-
-		e.pull(ctx, o)
-		o.UpdateQuantity(oq.Sub(oq))
-
-		volume := Volume{
-			Quantity: oq,
-			Price:    op.Mul(oq),
-		}
-
-		e.incBalance(
-			ctx,
-			listener,
-			o,
-			volume.Quantity,
-			volume.Price,
-			e.feeHandler.HandleFeeMaker,
-		)
-
-		listener.OnExistingOrderDone(ctx, o, volume)
-
-		qtyLeft = qtyLeft.Sub(oq)
-	}
-
-	return
-}
-
 func (e *Engine) quantity(sell bool, priceLim Value) Value {
 	var (
 		level    *queue
@@ -564,11 +534,12 @@ func (e *Engine) price(sell bool, quantity Value) (Value, error) {
 	return price, nil
 }
 
-func (e *Engine) incBalance(
+func (e *Engine) updateBalanceOnExchanged(
 	ctx context.Context,
 	listener EventListener,
-	o Order, quantity, price Value,
-	handleFee func(context.Context, Order, Asset, Value) (out Value),
+	o Order,
+	v Volume,
+	isMaker bool,
 ) {
 	var (
 		wallet             = o.Owner()
@@ -579,31 +550,40 @@ func (e *Engine) incBalance(
 	if o.Sell() {
 		assetInc = e.quote
 		assetDec = e.base
-		valueInc = price
-		valueDec = quantity
+		valueInc = v.Price
+		valueDec = v.Quantity
 	} else {
 		assetInc = e.base
 		assetDec = e.quote
-		valueInc = quantity
-		valueDec = price
+		valueInc = v.Quantity
+		valueDec = v.Price
 	}
 
-	valueInc = handleFee(ctx, o, assetInc, valueInc)
+	if isMaker {
+		valueInc = e.feeHandler.HandleFeeMaker(ctx, o, assetInc, valueInc)
+	} else {
+		valueInc = e.feeHandler.HandleFeeTaker(ctx, o, assetInc, valueInc)
+	}
 
 	valBalance := valueInc.Add(wallet.Balance(ctx, assetInc))
 	wallet.UpdateBalance(ctx, assetInc, valBalance)
 	listener.OnBalanceChanged(ctx, wallet, assetInc, valBalance)
 
-	valInOrder := wallet.InOrder(ctx, assetDec).Sub(valueDec)
-	wallet.UpdateInOrder(ctx, assetDec, valInOrder)
-	listener.OnInOrderChanged(ctx, wallet, assetDec, valInOrder)
+	if isMaker {
+		valInOrder := wallet.InOrder(ctx, assetDec).Sub(valueDec)
+		wallet.UpdateInOrder(ctx, assetDec, valInOrder)
+		listener.OnInOrderChanged(ctx, wallet, assetDec, valInOrder)
+	} else {
+		valInOrder := wallet.Balance(ctx, assetDec).Sub(valueDec)
+		wallet.UpdateBalance(ctx, assetDec, valInOrder)
+		listener.OnBalanceChanged(ctx, wallet, assetDec, valInOrder)
+	}
 }
 
-func (e *Engine) decBalance(
+func (e *Engine) updateBalanceOnPlaced(
 	ctx context.Context,
 	listener EventListener,
 	o Order,
-	quantity, price Value,
 ) {
 	var (
 		wallet = o.Owner()
@@ -613,10 +593,10 @@ func (e *Engine) decBalance(
 
 	if o.Sell() {
 		asset = e.base
-		value = quantity
+		value = o.Quantity()
 	} else {
 		asset = e.quote
-		value = price
+		value = o.Price().Mul(o.Quantity())
 	}
 
 	valBalance := wallet.Balance(ctx, asset).Sub(value)
@@ -826,7 +806,7 @@ func (q *queue) remove(ctx context.Context, e *list.Element) Order {
 	return q.orders.Remove(e).(Order)
 }
 
-func (q *queue) update(ctx context.Context, e *list.Element, qty Value) Order {
+func (q *queue) updateQuantity(ctx context.Context, e *list.Element, qty Value) Order {
 	o := e.Value.(Order)
 	q.volume = q.volume.Sub(o.Quantity()).Add(qty)
 	o.UpdateQuantity(qty)

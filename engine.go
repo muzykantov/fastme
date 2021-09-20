@@ -192,6 +192,7 @@ func (e *Engine) PlaceOrder(
 
 				maker.UpdateQuantity(makerQty.Sub(makerQty))
 				taker.UpdateQuantity(takerQty.Sub(takerQty))
+				e.updateBalancesOnExchanged(ctx, listener, maker, taker, volume)
 				listener.OnExistingOrderDone(ctx, maker, volume)
 				listener.OnIncomingOrderDone(ctx, taker, volume)
 
@@ -204,6 +205,7 @@ func (e *Engine) PlaceOrder(
 
 				maker.UpdateQuantity(makerQty.Sub(makerQty))
 				taker.UpdateQuantity(takerQty.Sub(makerQty))
+				e.updateBalancesOnExchanged(ctx, listener, maker, taker, volume)
 				listener.OnExistingOrderDone(ctx, maker, volume)
 				listener.OnIncomingOrderPartial(ctx, taker, volume)
 
@@ -219,25 +221,10 @@ func (e *Engine) PlaceOrder(
 					makerQty.Sub(takerQty),
 				)
 				taker.UpdateQuantity(takerQty.Sub(takerQty))
+				e.updateBalancesOnExchanged(ctx, listener, maker, taker, volume)
 				listener.OnExistingOrderPartial(ctx, maker, volume)
 				listener.OnIncomingOrderDone(ctx, taker, volume)
 			}
-
-			e.updateBalanceOnExchanged(
-				ctx,
-				listener,
-				maker,
-				volume,
-				true,
-			)
-
-			e.updateBalanceOnExchanged(
-				ctx,
-				listener,
-				taker,
-				volume,
-				false,
-			)
 		}
 
 		bestPriceQueue = next()
@@ -534,7 +521,17 @@ func (e *Engine) price(sell bool, quantity Value) (Value, error) {
 	return price, nil
 }
 
-func (e *Engine) updateBalanceOnExchanged(
+func (e *Engine) updateBalancesOnExchanged(
+	ctx context.Context,
+	listener EventListener,
+	maker, taker Order,
+	v Volume,
+) {
+	e.updateBalance(ctx, listener, maker, v, true)
+	e.updateBalance(ctx, listener, taker, v, false)
+}
+
+func (e *Engine) updateBalance(
 	ctx context.Context,
 	listener EventListener,
 	o Order,
